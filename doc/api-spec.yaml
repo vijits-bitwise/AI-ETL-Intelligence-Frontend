@@ -1,0 +1,597 @@
+openapi: 3.0.3
+
+info:
+  title: AI Support Intelligence API
+  version: 2.0.0
+  description: |
+    LangGraph + Claude-powered TWS/ETL incident analysis system.
+
+    Analyses production incidents against SQL Server historical data and returns:
+    - Structured incident metadata with AI-assessed business impact
+    - Categorised root cause analysis (Claude Sonnet)
+    - Numbered resolution steps with titles and descriptions (Claude Sonnet)
+    - Validation checklist and prevention recommendation
+    - Escalation routing (Scrum Team, Assignment Group)
+    - References: similar incidents, TWS log paths, Confluence runbook links
+    - Evidence-weighted confidence scorecard (deterministic)
+
+    Every response is persisted to `dbo.incident_resolution` with a timestamp.
+    Subsequent requests for the same `incident_no` are served from the database
+    without re-invoking the AI pipeline.
+
+    ## Architecture
+    `FastAPI → LangGraph (9 nodes) → MCP Layer → SQL Server + Atlassian + Claude API`
+
+    ## LLM Model Assignment
+    - **Claude Haiku** (`claude-haiku-4-5-20251001`): context extraction (Node 2)
+    - **Claude Sonnet** (`claude-sonnet-4-6`): RCA (Node 7) + Resolution (Node 8)
+
+    ## Important
+    - All outputs are **recommendations only** — no automated execution
+    - Scope is limited to TWS / Informatica / KSH — no DB or file system actions
+    - api-spec.yaml is the **source of truth** — update spec before updating code
+
+  contact:
+    name: Bitwise Global — ETL Intelligence Team
+    email: vijit.singh@bitwiseglobal.com
+
+  license:
+    name: Internal Use Only
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: http://localhost:9000
+    description: MCP Data Service (internal)
+
+tags:
+  - name: Incident Analysis
+    description: |
+      Core analysis pipeline. Accepts an incident and returns a fully structured
+      resolution report persisted to `dbo.incident_resolution`.
+  - name: Health
+    description: Service readiness and status endpoints.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────────────────────
+
+paths:
+
+  /analyze-incident:
+    post:
+      operationId: analyze_incident
+      summary: Analyse a TWS/ETL incident
+      description: |
+        Runs the full 9-node LangGraph pipeline:
+
+        1. **normalize_input** — combines incident text
+        2. **extract_context** — Claude Haiku structured extraction
+        3. **lookup_historical_incidents** — MCP → dbo.Incident
+        4. **lookup_job_stream_context** — MCP → dbo.Job_Stream_Info
+        5. **lookup_confluence_context** — MCP → dbo.Subject_Area_Confluence → Atlassian page fetch
+        6. **match_error_patterns** — MCP → dbo.Job_Error_Log
+        7. **generate_rca** — Claude Sonnet structured RCA JSON
+        8. **generate_resolution** — Claude Sonnet structured resolution JSON
+        9. **score_confidence** — evidence-weighted confidence (0–100)
+
+        If the `incident_no` already exists in `dbo.incident_resolution`, the
+        stored response is returned immediately (no AI pipeline invoked).
+
+        Result is saved to `dbo.incident_resolution` on first generation.
+      tags:
+        - Incident Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentRequest'
+            example:
+              incident_no: "INC9347965"
+              short_description: "[TWS-PROD] ETL_UTLOP_BATCH :: Re-run of job BIT_RMS_1110_REP.BIT_RMS_1110_TSFHEAD_EXT has ended abnormally (ABEND)."
+              long_description: "Error: New CDC execution is blocked because a CDC file already exists: ff_rms_shipsku_pwx_cdc.dat. Please use DISC instructions to resolve."
+      responses:
+        '200':
+          description: Analysis completed (or retrieved from cache) successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentResponse'
+              example:
+                incident_info:
+                  incident_no: "INC9347965"
+                  short_description: "[TWS-PROD] ETL_UTLOP_BATCH :: Re-run of job BIT_RMS_1110_REP.BIT_RMS_1110_TSFHEAD_EXT has ended abnormally (ABEND)."
+                  description: "Error: New CDC execution is blocked because a CDC file already exists: ff_rms_shipsku_pwx_cdc.dat."
+                  created_at: "2026-05-21T10:30:00"
+                  stream_name: "BIT_RMS_1110_TSFHEAD_EXT"
+                  job_name: "BIT_RMS_1110_REP"
+                  priority: "P2"
+                  environment: "Prod"
+                  business_impact: "High"
+                root_cause:
+                  category: "FILE_CONFLICT"
+                  sub_category: "CDC File Lock"
+                  error_code: "ABEND"
+                  root_cause: "The CDC file ff_rms_shipsku_pwx_cdc.dat was not cleaned up after a previous aborted run, blocking a new CDC execution. This is a known recurring pattern in the BIT_RMS_1110_REP stream."
+                resolution_steps:
+                  - step_no: 1
+                    title: "Retrieve TWS Job Execution Log"
+                    description: "Open the TWS console and locate the execution log for BIT_RMS_1110_REP. Note the exact ABEND timestamp and job agent name."
+                  - step_no: 2
+                    title: "Identify the Stale CDC File"
+                    description: "Check the Informatica Workflow Monitor session log for the file path of ff_rms_shipsku_pwx_cdc.dat and confirm it exists."
+                  - step_no: 3
+                    title: "Remove the CDC File"
+                    description: "Follow the DISC cleanup procedure to delete the stale CDC file from the shared file system path."
+                  - step_no: 4
+                    title: "Re-run the Failed Job"
+                    description: "From the TWS console, re-submit BIT_RMS_1110_REP. Monitor until the job reaches SUCC status."
+                  - step_no: 5
+                    title: "Validate Informatica Session Result"
+                    description: "Confirm the Informatica session completes with zero error rows and the CDC file is absent after the run."
+                validation_checklist:
+                  - check: "CDC file ff_rms_shipsku_pwx_cdc.dat is removed"
+                    system: "Unix / Shared File System"
+                  - check: "BIT_RMS_1110_REP reaches SUCC in TWS"
+                    system: "TWS Console"
+                  - check: "Informatica session shows zero error rows"
+                    system: "Informatica Workflow Monitor"
+                prevention: "Add a pre-check script in the TWS job definition that aborts the job if the CDC file exists before execution begins, and alerts on-call support before the ABEND occurs."
+                escalation_path:
+                  required: "Yes"
+                  scrum_team: "CDC Team"
+                  assignment_group: "ETL Support Group"
+                references:
+                  similar_incidents:
+                    - "INC9012345"
+                    - "INC8756231"
+                  tws_logs:
+                    - "/opt/tws/logs/BIT_RMS_1110_REP_20260521.log"
+                  confluence_links:
+                    - title: "ETL-ACC Accounting"
+                      url: "https://bitwiseglobal-team-i9nl2yb9.atlassian.net/wiki/spaces/ETL/pages/917507/ETL-ACC+Accounting"
+                    - title: "L1 L2 Support Team Do's and Don'ts Guide"
+                      url: "https://bitwiseglobal-team-i9nl2yb9.atlassian.net/wiki/spaces/ETL/pages/786433"
+                confidence_scorecard:
+                  percentage: 82
+                  reason: "Based on: 3 similar historical incidents, job/stream metadata found (1 record), 5 matching error pattern(s)."
+        '400':
+          description: Malformed request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Invalid request: incident_no is required."
+        '422':
+          description: Request body failed Pydantic validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Internal pipeline error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Analysis pipeline error: Claude API rate limit reached."
+
+  /status:
+    get:
+      operationId: get_status
+      summary: Service readiness check
+      description: |
+        Returns SQL table status and MCP service reachability.
+
+        - `ingestion_complete`: True once all SQL tables are populated
+        - `mcp_reachable`: True if mcp_server responds on port 9000
+
+        Check this endpoint after startup before making analysis requests.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                ingestion_complete: true
+                ingestion_loading: false
+                tables_loaded:
+                  - Job_Stream_Info
+                  - Incident
+                  - Job_Run_History
+                  - Job_Error_Log
+                  - Job_Change_Log
+                mcp_reachable: true
+                mcp_url: "http://localhost:9000"
+
+  /:
+    get:
+      operationId: health_check
+      summary: Liveness check
+      description: Returns OK if the service process is running.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                service: AI Support Intelligence API
+                version: "2.0.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+components:
+  schemas:
+
+    # ── Request ───────────────────────────────────────────────────────────────
+
+    IncidentRequest:
+      type: object
+      required:
+        - incident_no
+        - short_description
+        - long_description
+      properties:
+        incident_no:
+          type: string
+          minLength: 1
+          description: SNOW incident identifier (e.g. INC9347965)
+          example: "INC9347965"
+        short_description:
+          type: string
+          minLength: 1
+          description: One-line alert text copied directly from the SNOW ticket
+          example: "[TWS-PROD] ETL_UTLOP_BATCH :: Re-run of job BIT_RMS_1110_REP.BIT_RMS_1110_TSFHEAD_EXT has ended abnormally (ABEND)."
+        long_description:
+          type: string
+          minLength: 1
+          description: Full incident description including error messages and context
+          example: "Error: New CDC execution is blocked because a CDC file already exists: ff_rms_shipsku_pwx_cdc.dat. Please use DISC instructions to resolve."
+
+    # ── Top-level Response ────────────────────────────────────────────────────
+
+    IncidentResponse:
+      type: object
+      required:
+        - incident_info
+        - root_cause
+        - resolution_steps
+        - validation_checklist
+        - prevention
+        - escalation_path
+        - references
+        - confidence_scorecard
+      properties:
+        incident_info:
+          $ref: '#/components/schemas/IncidentInfo'
+        root_cause:
+          $ref: '#/components/schemas/RootCause'
+        resolution_steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResolutionStep'
+          description: Ordered list of resolution steps produced by Claude Sonnet
+        validation_checklist:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationCheck'
+          description: Post-resolution verification checks with system context
+        prevention:
+          type: string
+          description: One-paragraph preventive recommendation to avoid recurrence
+          example: "Add a pre-check script in the TWS job definition that aborts the job if the CDC file exists before execution begins."
+        escalation_path:
+          $ref: '#/components/schemas/EscalationPath'
+        references:
+          $ref: '#/components/schemas/References'
+        confidence_scorecard:
+          $ref: '#/components/schemas/ConfidenceScorecard'
+
+    # ── Sub-schemas ───────────────────────────────────────────────────────────
+
+    IncidentInfo:
+      type: object
+      description: Incident metadata enriched with job ownership from dbo.Job_Stream_Info
+      required:
+        - incident_no
+        - short_description
+        - description
+        - created_at
+        - priority
+        - environment
+        - business_impact
+      properties:
+        incident_no:
+          type: string
+          description: SNOW incident identifier
+          example: "INC9347965"
+        short_description:
+          type: string
+          description: One-line alert text from SNOW
+          example: "[TWS-PROD] ETL_UTLOP_BATCH :: Re-run of job BIT_RMS_1110_REP ended abnormally (ABEND)."
+        description:
+          type: string
+          description: Full incident description (long_description from request)
+          example: "Error: New CDC execution is blocked because a CDC file already exists."
+        created_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of when the analysis was generated
+          example: "2026-05-21T10:30:00"
+        stream_name:
+          type: string
+          description: TWS stream name extracted from incident text or job metadata (null if not found)
+          example: "BIT_RMS_1110_TSFHEAD_EXT"
+          nullable: true
+        job_name:
+          type: string
+          description: TWS job name extracted from incident text or job metadata (null if not found)
+          example: "BIT_RMS_1110_REP"
+          nullable: true
+        priority:
+          type: string
+          description: Incident priority — defaults to P2
+          default: "P2"
+          example: "P2"
+        environment:
+          type: string
+          description: Target environment — defaults to Prod
+          default: "Prod"
+          example: "Prod"
+        business_impact:
+          type: string
+          description: |
+            AI-assessed business impact level based on job criticality, error class,
+            and historical incident severity.
+          enum: [Critical, High, Medium, Low]
+          example: "High"
+
+    RootCause:
+      type: object
+      description: Structured root cause analysis produced by Claude Sonnet
+      required:
+        - category
+        - sub_category
+        - error_code
+        - root_cause
+      properties:
+        category:
+          type: string
+          description: |
+            Top-level error category matching the extract_context error_class.
+          enum: [FILE_CONFLICT, ABEND, TIMEOUT, DEADLOCK, AUTH, UNKNOWN]
+          example: "FILE_CONFLICT"
+        sub_category:
+          type: string
+          description: Specific error sub-type within the category
+          example: "CDC File Lock"
+        error_code:
+          type: string
+          description: |
+            Technical error code or signal (e.g. TWS ABEND code, SQL error code,
+            or "UNKNOWN" if not determinable)
+          example: "ABEND"
+        root_cause:
+          type: string
+          description: |
+            2–4 sentence root cause narrative produced by Claude Sonnet.
+            Set to "Insufficient evidence to determine root cause." when
+            available data does not support a conclusion.
+          example: "The CDC file ff_rms_shipsku_pwx_cdc.dat was not cleaned up after a previous aborted run, blocking new CDC execution."
+
+    ResolutionStep:
+      type: object
+      description: A single numbered resolution action
+      required:
+        - step_no
+        - title
+        - description
+      properties:
+        step_no:
+          type: integer
+          description: Sequential step number starting at 1
+          example: 1
+        title:
+          type: string
+          description: Short action title (≤10 words)
+          example: "Retrieve TWS Job Execution Log"
+        description:
+          type: string
+          description: |
+            Detailed step instructions scoped to TWS / Informatica / KSH.
+            May include a Confluence runbook link where applicable.
+          example: "Open the TWS console and locate the execution log for BIT_RMS_1110_REP. Note the exact ABEND timestamp."
+
+    ValidationCheck:
+      type: object
+      description: A single post-resolution verification item
+      required:
+        - check
+        - system
+      properties:
+        check:
+          type: string
+          description: What to verify
+          example: "BIT_RMS_1110_REP reaches SUCC in TWS"
+        system:
+          type: string
+          description: System or tool where the check is performed
+          example: "TWS Console"
+
+    EscalationPath:
+      type: object
+      description: Ownership and escalation routing derived from dbo.Job_Stream_Info
+      required:
+        - required
+        - scrum_team
+        - assignment_group
+      properties:
+        required:
+          type: string
+          description: Whether escalation is recommended based on confidence and error severity
+          enum: [Yes, No]
+          example: "Yes"
+        scrum_team:
+          type: string
+          description: Scrum team responsible for the affected job/stream
+          example: "CDC Team"
+        assignment_group:
+          type: string
+          description: ServiceNow assignment group for routing
+          example: "ETL Support Group"
+
+    References:
+      type: object
+      description: Evidence sources used during analysis
+      properties:
+        similar_incidents:
+          type: array
+          items:
+            type: string
+          description: INC numbers of historically similar incidents found in dbo.Incident
+          example: ["INC9012345", "INC8756231"]
+        tws_logs:
+          type: array
+          items:
+            type: string
+          description: |
+            TWS / Informatica log file paths referenced in the resolution.
+            Derived from job metadata and error log records.
+          example: ["/opt/tws/logs/BIT_RMS_1110_REP_20260521.log"]
+        confluence_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfluenceLink'
+          description: Curated Confluence runbook and SOP pages referenced in the resolution
+
+    ConfluenceLink:
+      type: object
+      description: A Confluence page referenced in the resolution
+      required:
+        - title
+        - url
+      properties:
+        title:
+          type: string
+          description: Page title as returned by the Atlassian API
+          example: "ETL-ACC Accounting"
+        url:
+          type: string
+          format: uri
+          description: Full Atlassian web URL to the page
+          example: "https://bitwiseglobal-team-i9nl2yb9.atlassian.net/wiki/spaces/ETL/pages/917507/ETL-ACC+Accounting"
+
+    ConfidenceScorecard:
+      type: object
+      description: Deterministic evidence-based confidence assessment
+      required:
+        - percentage
+        - reason
+      properties:
+        percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: |
+            Evidence-weighted confidence percentage (0–100).
+            Weights: similar incidents (up to 70%) + job metadata (+15%)
+            + error matches (+4% each, capped at +12%).
+            Capped at 30% when RCA flags insufficient evidence.
+          example: 82
+        reason:
+          type: string
+          description: Human-readable explanation of how the score was computed
+          example: "Based on: 3 similar historical incidents, job/stream metadata found (1 record), 5 matching error pattern(s)."
+
+    # ── Error responses ───────────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
+          example: "Analysis pipeline error: Claude API rate limit reached."
+
+    ValidationErrorResponse:
+      type: object
+      description: FastAPI/Pydantic validation error (HTTP 422)
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                description: Location of the validation error (field path)
+              msg:
+                type: string
+                description: Error message
+              type:
+                type: string
+                description: Pydantic error type code
+
+    # ── Health / status ───────────────────────────────────────────────────────
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+        service:
+          type: string
+          example: AI Support Intelligence API
+        version:
+          type: string
+          example: "2.0.0"
+
+    StatusResponse:
+      type: object
+      properties:
+        ingestion_complete:
+          type: boolean
+          description: True once all SQL tables have been populated from Excel
+        ingestion_loading:
+          type: boolean
+          description: True while Excel → SQL ingestion is in progress
+        tables_loaded:
+          type: array
+          items:
+            type: string
+          description: Names of SQL tables that have been successfully loaded
+          example:
+            - Job_Stream_Info
+            - Incident
+            - Job_Run_History
+            - Job_Error_Log
+            - Job_Change_Log
+        mcp_reachable:
+          type: boolean
+          description: True if the MCP Data Service responded on port 9000
+        mcp_url:
+          type: string
+          description: Base URL of the MCP Data Service
+          example: "http://localhost:9000"
