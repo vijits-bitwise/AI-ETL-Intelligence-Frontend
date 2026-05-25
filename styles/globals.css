@@ -2,16 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-html {
-  scroll-behavior: smooth;
-}
+  html {
+    scroll-behavior: smooth;
+    /* Prevent horizontal overflow at the root */
+    overflow-x: hidden;
+  }
 
-body {
-  @apply bg-gray-100 text-gray-900 font-sans;
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    /* Crisp text rendering on all platforms */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
 }

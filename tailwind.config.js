@@ -7,10 +7,18 @@ module.exports = {
   ],
   theme: {
     extend: {
-      colors: {
-        gray: {
-          100: '#f3f4f6',
-        },
+      fontFamily: {
+        // Prioritises Segoe UI on Windows (enterprise feel), SF Pro on Mac, fallback to system-ui
+        sans: [
+          '"Segoe UI"',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif',
+        ],
       },
     },
   },

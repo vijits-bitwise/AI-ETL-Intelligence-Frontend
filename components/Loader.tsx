@@ -1,10 +1,8 @@
 export default function Loader() {
   return (
-    <div className="flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-        <p className="text-sm text-gray-600 font-medium">Analyzing incident...</p>
-      </div>
+    <div className="flex flex-col items-center gap-3 py-2">
+      <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
+      <p className="text-sm font-medium text-slate-500">Analyzing incident…</p>
     </div>
   );
 }
