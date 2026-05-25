@@ -24,6 +24,16 @@ Displays AI-generated incident analysis from the backend API at `http://127.0.0.
 | `doc/api-spec.yaml` | OpenAPI 3.0.3 backend contract (source of truth for data shapes) |
 | `doc/GITHUB-SPECKIT.md` | Frontend integration spec — UI sections, component mapping |
 
+## Project Docs
+
+| Doc | Purpose |
+|-----|---------|
+| `docs/constitution.md` | Governing principles — read before any feature work |
+| `docs/architecture.md` | Full app structure, data flow, design decisions |
+| `docs/data-model.md` | All TypeScript interfaces with field-level descriptions |
+| `docs/component-guide.md` | Component inventory, helpers, Tailwind patterns |
+| `docs/specs/` | Feature specs (spec-driven workflow) |
+
 ## API Contract
 
 - **Base URL**: `http://127.0.0.1:8000`
@@ -60,19 +70,28 @@ All feature work follows the **SpecKit workflow**. No code is written without an
 
 | Command | When to run |
 |---------|-------------|
-| `/analyze "<requirement>"` | For any new feature or bug fix — generates spec + GitHub issue |
-| `/implement "docs/specs/N-slug.md"` | After spec is APPROVED — creates branch, implements changes |
-| `/review "docs/specs/N-slug.md"` | After implementation, before raising PR |
-| `/generate-tests "docs/specs/N-slug.md"` | Anytime after spec is APPROVED |
+| `/constitution` | View governing principles; `/constitution <amendment>` to update |
+| `/analyze "<requirement>"` | Generate spec + GitHub issue for any new feature or bug fix |
+| `/plan "docs/specs/N-slug.md"` | Technical planning pass after spec is APPROVED — before implementing |
+| `/implement "docs/specs/N-slug.md"` | Implement the spec — creates branch, changes only Section I files |
+| `/review "docs/specs/N-slug.md"` | PASS/FAIL compliance check after implementation |
+| `/generate-tests "docs/specs/N-slug.md"` | Generate Playwright tests from spec test cases |
+| `/taskstoissues "docs/specs/N-slug/plan.md"` | Convert plan task list to GitHub issues |
 
 ### Workflow
 
 ```
-/analyze → human approves → GitHub issue created → spec committed to main
+/constitution               ← read this first on a new feature
 
-/implement → branch speckit/<N>-<slug> created → files in spec Section I changed
+/analyze "<requirement>"    ← generates spec → human approves → GitHub issue created → spec committed
 
-/review → PASS/FAIL per section → human raises PR → merge to main
+/plan "docs/specs/N.md"     ← technical plan: research, design decisions, ordered tasks
+
+/taskstoissues "docs/specs/N/plan.md"   ← optional: create GitHub issues per task
+
+/implement "docs/specs/N.md"   ← creates speckit/<N>-slug branch, implements Section I files
+
+/review "docs/specs/N.md"      ← PASS/FAIL per section → human raises PR → merge to main
 ```
 
 ### Spec structure
