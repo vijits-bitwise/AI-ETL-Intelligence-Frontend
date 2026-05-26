@@ -433,76 +433,71 @@ export default function ResultCard({ data }: ResultCardProps) {
                 </div>
               </div>
             </Card>
-          </div>
-        </div>
 
-        {/* ── 3. FOOTER ROW — Confidence + Prevention ─────────────────────── */}
-        <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
+            {/* AI Confidence Score */}
+            <Card>
+              <CardHeader label="AI Assessment" title="Confidence Score" />
+              <div className="p-6">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                  {/* SVG ring — percentage prominent in the centre */}
+                  <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
+                    <svg
+                      className="absolute inset-0 h-full w-full -rotate-90"
+                      viewBox="0 0 128 128"
+                      aria-hidden="true"
+                    >
+                      {/* Track */}
+                      <circle cx="64" cy="64" r={R} fill="none" stroke="#e2e8f0" strokeWidth="10" />
+                      {/* Progress — uses blue-600 (#2563eb) */}
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r={R}
+                        fill="none"
+                        stroke="#2563eb"
+                        strokeWidth="10"
+                        strokeDasharray={`${circumference * (confidencePercentage / 100)} ${circumference}`}
+                        strokeLinecap="round"
+                        className="transition-all duration-700"
+                      />
+                    </svg>
+                    {/* Centred label */}
+                    <div className="relative flex flex-col items-center text-center">
+                      <span className="text-3xl font-bold leading-none text-slate-900">{confidencePercentage}%</span>
+                      <span className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Score</span>
+                    </div>
+                  </div>
 
-          {/* AI Confidence Score */}
-          <Card>
-            <CardHeader label="AI Assessment" title="Confidence Score" />
-            <div className="p-6">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                {/* SVG ring — percentage prominent in the centre */}
-                <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
-                  <svg
-                    className="absolute inset-0 h-full w-full -rotate-90"
-                    viewBox="0 0 128 128"
-                    aria-hidden="true"
-                  >
-                    {/* Track */}
-                    <circle cx="64" cy="64" r={R} fill="none" stroke="#e2e8f0" strokeWidth="10" />
-                    {/* Progress — uses blue-600 (#2563eb) */}
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r={R}
-                      fill="none"
-                      stroke="#2563eb"
-                      strokeWidth="10"
-                      strokeDasharray={`${circumference * (confidencePercentage / 100)} ${circumference}`}
-                      strokeLinecap="round"
-                      className="transition-all duration-700"
-                    />
-                  </svg>
-                  {/* Centred label */}
-                  <div className="relative flex flex-col items-center text-center">
-                    <span className="text-3xl font-bold leading-none text-slate-900">{confidencePercentage}%</span>
-                    <span className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Score</span>
+                  {/* Reason text */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">Confidence Assessment</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                      {data.confidence_scorecard.reason}
+                    </p>
                   </div>
                 </div>
+              </div>
+            </Card>
 
-                {/* Reason text */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">Confidence Assessment</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-                    {data.confidence_scorecard.reason}
-                  </p>
+            {/* Preventive Recommendation */}
+            <Card>
+              <CardHeader label="Prevention" title="Preventive Recommendation" />
+              <div className="p-6">
+                {/* Info icon + prose */}
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                    <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {renderProse(data.prevention)}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-
-          {/* Preventive Recommendation */}
-          <Card>
-            <CardHeader label="Prevention" title="Preventive Recommendation" />
-            <div className="p-6">
-              {/* Info icon + prose */}
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                  <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  {renderProse(data.prevention)}
-                </div>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
-
         {/* ── 4. ACTION BAR ────────────────────────────────────────────────── */}
         <div className="flex justify-end pb-2">
           <Link
