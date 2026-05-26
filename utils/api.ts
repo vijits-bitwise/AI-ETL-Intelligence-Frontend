@@ -6,6 +6,30 @@ export interface IncidentPayload {
   long_description: string;
 }
 
+// ── Chat interfaces (POST /chat) ──────────────────────────────────────────────
+
+export interface ChatRequest {
+  incident_no: string;
+  message: string;
+  accumulated_context: string;  // "" on first turn; grows with each confirmed context
+  confirmed: boolean;           // false = understand phase; true = regenerate phase
+}
+
+export interface ChatResponse {
+  understanding: string;
+  requires_confirmation: boolean;
+  updated_analysis: AnalysisResponse | null;
+}
+
+// ── localStorage stored shape ─────────────────────────────────────────────────
+// Replaces raw AnalysisResponse so the incident payload is available for chat regeneration.
+// app/result/page.tsx handles the backward-compat case (old raw shape still works).
+
+export interface StoredAnalysis {
+  payload: IncidentPayload;
+  response: AnalysisResponse;
+}
+
 export interface IncidentInfo {
   incident_no: string;
   short_description: string;
@@ -67,6 +91,22 @@ export interface AnalysisResponse {
   escalation_path: EscalationPath;
   references: References;
   confidence_scorecard: ConfidenceScorecard;
+}
+
+export async function sendChatMessage(payload: ChatRequest): Promise<ChatResponse> {
+  const response = await fetch(`${API_BASE_URL}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 export async function analyzeIncident(payload: IncidentPayload): Promise<AnalysisResponse> {

@@ -1,19 +1,30 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import ResultCard from '@/components/ResultCard';
-import { AnalysisResponse } from '@/utils/api';
+import ChatPanel from '@/components/ChatPanel';
+import { AnalysisResponse, StoredAnalysis } from '@/utils/api';
 
 function ResultContent() {
   const searchParams = useSearchParams();
   const storageKey = searchParams.get('key');
-  const incidentNo = searchParams.get('incident_no') || undefined;
+  const incidentNo = searchParams.get('incident_no') || '';
   const shortDescription = searchParams.get('short_description') || undefined;
 
   const [data, setData] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ── Chat state ────────────────────────────────────────────────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResponse | null>(null);
+  const [isUpdated, setIsUpdated] = useState(false);
+
+  const handleAnalysisUpdated = useCallback((updated: AnalysisResponse) => {
+    setCurrentAnalysis(updated);
+    setIsUpdated(true);
+  }, []);
 
   useEffect(() => {
     if (!storageKey) {
@@ -28,7 +39,7 @@ function ResultContent() {
         console.log('Attempting to retrieve storage key:', storageKey);
         console.log('Current port:', window.location.port);
         const storedData = localStorage.getItem(storageKey);
-        
+
         if (!storedData) {
           console.error('No data found for storage key:', storageKey);
           console.log('Available keys in localStorage:', Object.keys(localStorage));
@@ -37,8 +48,22 @@ function ResultContent() {
         }
 
         console.log('Data retrieved successfully, parsing...');
-        const parsedData: AnalysisResponse = JSON.parse(storedData);
-        setData(parsedData);
+        const parsed = JSON.parse(storedData);
+
+        // Backward-compat: old shape is raw AnalysisResponse (has incident_info at root)
+        // New shape is StoredAnalysis: { payload, response }
+        let analysisResponse: AnalysisResponse;
+        if (parsed && 'incident_info' in parsed) {
+          // Old shape — raw AnalysisResponse
+          analysisResponse = parsed as AnalysisResponse;
+        } else {
+          // New shape — StoredAnalysis
+          const stored = parsed as StoredAnalysis;
+          analysisResponse = stored.response;
+        }
+
+        setData(analysisResponse);
+        setCurrentAnalysis(analysisResponse);
 
         // Clean up the stored data after use
         localStorage.removeItem(storageKey);
@@ -83,8 +108,35 @@ function ResultContent() {
     );
   }
 
+  const displayData = currentAnalysis ?? data;
+
+  if (chatOpen) {
+    return (
+      <div className="grid lg:grid-cols-[3fr_2fr] h-screen overflow-hidden">
+        {/* Analysis panel — scrollable */}
+        <div className="overflow-y-auto">
+          <ResultCard
+            data={displayData}
+            onOpenChat={() => setChatOpen(true)}
+            isUpdated={isUpdated}
+          />
+        </div>
+        {/* Chat sidebar */}
+        <ChatPanel
+          incidentNo={incidentNo}
+          onClose={() => setChatOpen(false)}
+          onAnalysisUpdated={handleAnalysisUpdated}
+        />
+      </div>
+    );
+  }
+
   return (
-    <ResultCard data={data} />
+    <ResultCard
+      data={displayData}
+      onOpenChat={() => setChatOpen(true)}
+      isUpdated={isUpdated}
+    />
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { analyzeIncident, AnalysisResponse, IncidentPayload } from '@/utils/api';
+import { analyzeIncident, AnalysisResponse, IncidentPayload, StoredAnalysis } from '@/utils/api';
 import Loader from './Loader';
 
 export default function IncidentForm() {
@@ -48,7 +48,9 @@ export default function IncidentForm() {
 
       const storageKey = `incident-analysis-${Date.now()}`;
       console.log('Storing data with key:', storageKey);
-      localStorage.setItem(storageKey, JSON.stringify(response));
+      // Store { payload, response } so the result page can pass the payload to /chat for regeneration
+      const storedAnalysis: StoredAnalysis = { payload, response };
+      localStorage.setItem(storageKey, JSON.stringify(storedAnalysis));
 
       const storedData = localStorage.getItem(storageKey);
       if (!storedData) throw new Error('Failed to store data in localStorage');

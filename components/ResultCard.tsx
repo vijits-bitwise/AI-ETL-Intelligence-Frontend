@@ -6,6 +6,8 @@ import { AnalysisResponse } from '@/utils/api';
 
 interface ResultCardProps {
   data: AnalysisResponse;
+  onOpenChat?: () => void;  // if provided, renders "Ask AI" button in incident header
+  isUpdated?: boolean;       // if true, renders "Updated" badge in incident header
 }
 
 // ─── Text processing helpers (logic unchanged) ────────────────────────────────
@@ -146,7 +148,7 @@ function CardHeader({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ResultCard({ data }: ResultCardProps) {
+export default function ResultCard({ data, onOpenChat, isUpdated = false }: ResultCardProps) {
   const incident = data.incident_info;
 
   // Terms to bold-highlight inside prose
@@ -190,8 +192,14 @@ export default function ResultCard({ data }: ResultCardProps) {
                 </div>
               </div>
 
-              {/* Priority / status / impact badges */}
+              {/* Priority / status / impact badges + optional Ask AI button */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Updated badge — shown after a chat-triggered regeneration */}
+                {isUpdated && (
+                  <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Updated
+                  </span>
+                )}
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles}`}>
                   {statusLabel}
                 </span>
@@ -210,6 +218,18 @@ export default function ResultCard({ data }: ResultCardProps) {
                   }`}>
                     Impact: {incident.business_impact}
                   </span>
+                )}
+                {/* Ask AI button — opens ChatPanel sidebar */}
+                {onOpenChat && (
+                  <button
+                    onClick={onOpenChat}
+                    className="ml-1 inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+                    </svg>
+                    Ask AI
+                  </button>
                 )}
               </div>
             </div>
