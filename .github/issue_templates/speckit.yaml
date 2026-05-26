@@ -1,0 +1,128 @@
+name: "SpecKit: Feature / Fix / Refactor"
+description: >
+  All changes to this codebase must start with a structured problem statement.
+  A spec will be generated from this issue before any code is written.
+title: "[SPECKIT] <short imperative title>"
+labels: ["speckit", "needs-spec"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # SpecKit Workflow
+
+        This form captures the complete problem statement. The `/analyze` command will generate a structured spec from your answers. **All six fields below are required.**
+
+        ---
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: "1. Problem Statement"
+      description: "What is the issue or feature request? Be specific about the pain point, current behavior, and desired outcome."
+      placeholder: |
+        Example:
+        - Current: The incident dashboard shows no escalation routing information
+        - Pain: Support team cannot determine who to contact for urgent issues
+        - Desired: Display escalation_path with team/group assignments in the result page
+      required: true
+    validations:
+      required: true
+
+  - type: dropdown
+    id: change_type
+    attributes:
+      label: "2. Change Type"
+      description: "Is this a new feature, bug fix, or refactoring?"
+      options:
+        - "feature"
+        - "fix"
+        - "refactor"
+        - "docs"
+      required: true
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: components
+    attributes:
+      label: "3. Affected Components"
+      description: "Select all components this change touches."
+      options:
+        - label: "`doc/api-spec.yaml`"
+        - label: "`utils/api.ts` (TypeScript interfaces)"
+        - label: "`components/IncidentForm.tsx`"
+        - label: "`components/ResultCard.tsx`"
+        - label: "`components/Loader.tsx`"
+        - label: "`app/page.tsx`"
+        - label: "`app/result/page.tsx`"
+        - label: "`app/layout.tsx`"
+        - label: "`docs/GITHUB-SPECKIT.md`"
+        - label: "Other (specify in description)"
+      required: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: "4. Acceptance Criteria (Test Cases)"
+      description: "Define 3–5 test cases in Given/When/Then format. These become your spec's test cases."
+      placeholder: |
+        Example:
+
+        **TC-1**: Escalation path displays when API returns data
+        - Given: IncidentForm submits a valid incident
+        - When: API response includes escalation_path.scrum_team
+        - Then: ResultCard renders escalation_path.scrum_team under "Escalation Routing" section
+
+        **TC-2**: Graceful handling when escalation path is missing
+        - Given: IncidentForm submits a valid incident
+        - When: API response has escalation_path = null
+        - Then: ResultCard does not render escalation section (or renders "Not applicable")
+      required: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: "5. Out of Scope"
+      description: "What should this spec explicitly NOT include? (Prevents scope creep.)"
+      placeholder: |
+        Example:
+        - Storing escalation routing history
+        - Integration with ServiceNow for real-time escalation lookup
+        - Email notifications to escalation group
+      required: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference_data
+    attributes:
+      label: "6. Reference Data / Examples"
+      description: "Provide example API responses, screenshots, or links to related incidents. Helps the analyzer understand the full context."
+      placeholder: |
+        Example:
+        - Screenshot of current dashboard (what's missing)
+        - Sample incident: INC9347965 (from backend docs)
+        - Confluence link: https://...
+        - Backend API docs: http://127.0.0.1:8000/docs
+      required: true
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## Next Steps
+
+        1. **Submit this issue** (labels: `speckit`, `needs-spec`)
+        2. **Run `/analyze "<problem-statement>"`** in Claude Code to generate the spec
+        3. **Review the spec** — if approved, the spec is committed to `docs/specs/`
+        4. **Implement** — run `/implement "docs/specs/N-slug.md"` when ready to code
+        5. **Review** — run `/review "docs/specs/N-slug.md"` before opening PR
+
+        For more details, see [`docs/CONTRIBUTING.md`](../../docs/CONTRIBUTING.md).
