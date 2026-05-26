@@ -21,8 +21,8 @@ Displays AI-generated incident analysis from the backend API at `http://127.0.0.
 | `app/page.tsx` | Homepage — renders `IncidentForm` |
 | `app/result/page.tsx` | Results page — reads localStorage, renders `ResultCard` |
 | `app/layout.tsx` | Root layout with metadata |
-| `doc/api-spec.yaml` | OpenAPI 3.0.3 backend contract (source of truth for data shapes) |
-| `doc/GITHUB-SPECKIT.md` | Frontend integration spec — UI sections, component mapping |
+| `docs/api-spec.yaml` | OpenAPI 3.0.3 backend contract (source of truth for data shapes) |
+| `docs/GITHUB-SPECKIT.md` | Frontend integration spec — UI sections, component mapping |
 
 ## Project Docs
 
@@ -41,7 +41,7 @@ Displays AI-generated incident analysis from the backend API at `http://127.0.0.
 - **Request**: `{ incident_no, short_description, long_description }`
 - **Response**: `AnalysisResponse` (see `utils/api.ts` for all interfaces)
 
-`doc/api-spec.yaml` is the authoritative contract. All TypeScript interfaces in `utils/api.ts`
+`docs/api-spec.yaml` is the authoritative contract. All TypeScript interfaces in `utils/api.ts`
 must mirror it exactly.
 
 ## Result Flow
@@ -101,11 +101,11 @@ See `docs/specs/README.md` for the full section reference.
 
 ### Implementation order (enforced by /implement)
 
-1. `doc/api-spec.yaml` — update YAML contract first (if api_spec_change=true)
+1. `docs/api-spec.yaml` — update YAML contract first (if api_spec_change=true)
 2. `utils/api.ts` — update TypeScript interfaces to mirror spec change
 3. `components/` — update or add components as specified
 4. `app/` — update pages/routes/navigation as specified
-5. `doc/GITHUB-SPECKIT.md` — update integration spec if component list or data flow changed
+5. `docs/GITHUB-SPECKIT.md` — update integration spec if component list or data flow changed
 
 ### Branch naming
 
